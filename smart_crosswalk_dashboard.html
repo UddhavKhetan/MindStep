@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Crosswalk Research Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-base: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header */
+        header {
+            padding: 15px 24px;
+            background: rgba(15, 23, 42, 0.9);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+        
+        .header-title { font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .header-badge { background: var(--accent-blue); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+
+        /* Main Grid Layout */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+        }
+
+        /* Left Column (Simulation & Charts) */
+        .main-col { display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .canvas-container {
+            flex: 1;
+            min-height: 400px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #1e293b; /* Fallback road color */
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 250px;
+        }
+
+        .chart-wrapper { position: relative; height: 100%; width: 100%; }
+
+        /* Right Column (Sidebar) */
+        .sidebar { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; padding-right: 5px; }
+
+        .section-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 10px; font-weight: 600; }
+
+        /* KPI Grid */
+        .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .kpi-card {
+            background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px; padding: 12px; text-align: center;
+        }
+        .kpi-val { font-size: 1.5rem; font-weight: bold; margin-bottom: 2px; }
+        .kpi-label { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Controls */
+        .control-group { margin-bottom: 15px; }
+        label { font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 5px; }
+        select, input[type="range"] {
+            width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border);
+            background: #0f172a; color: white; outline: none; font-family: var(--font-main);
+        }
+        .btn-group { display: flex; gap: 10px; }
+        button {
+            flex: 1; padding: 8px 12px; background: #334155; border: 1px solid var(--panel-border);
+            color: white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;
+        }
+        button:hover { background: #475569; }
+        button.primary { background: var(--accent-blue); border-color: var(--accent-blue); }
+        button.primary:hover { background: #2563eb; }
+
+        /* Inspector & Event Log */
+        .inspector-content { font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; line-height: 1.5; color: #cbd5e1; }
+        .inspector-content span { color: var(--accent-green); font-weight: bold; }
+        
+        .event-log {
+            flex: 1; min-height: 150px; background: rgba(0,0,0,0.3); border-radius: 6px;
+            padding: 10px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 0.8rem;
+        }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+        .log-time { color: var(--accent-yellow); margin-right: 5px; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            🚦 Smart Crosswalk Lab <span class="header-badge">LIVE SIMULATION</span>
+        </div>
+        <div style="font-size: 0.9rem; color: var(--text-muted);">
+            Phase: <span id="ui-phase" style="color: var(--accent-green); font-weight: bold;">EW_GREEN</span> | 
+            Time: <span id="ui-time">0.0s</span>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+        <div class="main-col">
+            <div class="glass-panel" style="flex: 2; padding: 0;">
+                <div class="canvas-container" id="canvas-wrapper">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="charts-container">
+                <div class="glass-panel">
+                    <div class="section-title">Performance Trade-offs</div>
+                    <div class="chart-wrapper"><canvas id="tradeoffChart"></canvas></div>
+                </div>
+                <div class="glass-panel">
+                    <div class="section-title">Demographic Equity (Gap Ratio)</div>
+                    <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="glass-panel">
+                <div class="section-title">Live Metrics</div>
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-val" id="kpi-wait" style="color: var(--accent-green)">0.0s</div>
+                        <div class="kpi-label">Avg Ped Wait</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-val" id="kpi-delay" style="color: var(--accent-red)">0.0s</div>
+                        <div class="kpi-label">Avg Veh Delay</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-val" id="kpi-misses">0</div>
+                        <div class="kpi-label">Near Misses</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-val" id="kpi-extensions" style="color: var(--accent-blue)">0</div>
+                        <div class="kpi-label">Extensions</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div class="section-title">Control Panel</div>
+                <div class="control-group">
+                    <label>Controller Policy</label>
+                    <select id="ctrl-policy">
+                        <option value="smart">SmartController (ML + Uncertainty)</option>
+                        <option value="heuristic">Heuristic Pedestrian</option>
+                        <option value="fixed">Fixed-Time Baseline</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Scenario</label>
+                    <select id="ctrl-scenario">
+                        <option value="normal">Normal Traffic</option>
+                        <option value="heavy">Heavy Traffic</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Simulation Speed: <span id="speed-val">1.0x</span></label>
+                    <input type="range" id="ctrl-speed" min="0.5" max="3.0" step="0.5" value="1.0">
+                </div>
+                <div class="btn-group">
+                    <button class="primary" id="btn-toggle">Pause</button>
+                    <button id="btn-restart">Restart</button>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div class="section-title">Agent Inspector</div>
+                <div class="inspector-content" id="inspector-data">
+                    <i>Click any vehicle or pedestrian to inspect state and ML parameters.</i>
+                </div>
+            </div>
+
+            <div class="glass-panel" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="section-title">Event Log</div>
+                <div class="event-log" id="event-log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & CONSTANTS ---
+        const CONFIG = {
+            scale: 12, // Pixels per meter
+            dt: 0.1,
+            colors: {
+                road: '#2b303b', sidewalk: '#3b4252', line: '#81a1c1', crosswalk: '#eceff4',
+                ped: {
+                    normal: '#4facfe', slow_walker: '#b088f9', distracted: '#f1c40f',
+                    elderly: '#e67e22', child: '#ff69b4', hurried: '#1abc9c', paired_group: '#95a5a6'
+                },
+                veh: '#ffffff', vehBrake: '#ff4757', lightGreen: '#2ecc71', lightRed: '#ff4757'
+            }
+        };
+
+        // --- STATE ---
+        let state = {
+            time: 0, paused: false, speedMult: 1.0,
+            phase: "EW_GREEN", phaseTime: 0,
+            pedestrians: [], vehicles: [],
+            metrics: { wait: 0, delay: 0, misses: 0, extensions: 0, pedsCleared: 0, vehsCleared: 0 },
+            selectedAgent: null,
+            policy: 'smart', scenario: 'normal',
+            nextPedSpawn: 0, nextVehSpawn: 0
+        };
+
+        // --- MOCK PYTHON ENGINE CLASSES ---
+        class Pedestrian {
+            constructor(id) {
+                this.id = id;
+                this.type = "ped";
+                const profiles = ["normal", "normal", "slow_walker", "distracted", "elderly", "child", "hurried"];
+                this.profile = profiles[Math.floor(Math.random() * profiles.length)];
+                
+                // Spawn points
+                this.x = -15 + Math.random();
+                this.y = -10 + (Math.random() * 2 - 1);
+                this.vx = 0; this.vy = 0;
+                
+                // Kinematics based on profile
+                const speeds = {normal: 1.4, slow_walker: 0.8, distracted: 1.4, elderly: 0.9, child: 1.0, hurried: 1.6, paired_group: 1.4};
+                this.speed = speeds[this.profile] || 1.4;
+                
+                this.pState = "APPROACHING"; // APPROACHING, WAITING, CROSSING, CLEARED
+                this.waitTime = 0;
+                this.intentProb = 0;
+                this.history = []; // For trails
+            }
+
+            update(dt) {
+                if (this.pState === "APPROACHING") {
+                    this.vx = this.speed;
+                    if (this.x >= -5.0) { this.x = -5.0; this.vx = 0; this.pState = "WAITING"; }
+                } else if (this.pState === "WAITING") {
+                    this.waitTime += dt;
+                    if (state.phase === "EW_GREEN") this.pState = "CROSSING";
+                } else if (this.pState === "CROSSING") {
+                    this.vx = self.speed || 1.4;
+                    if (this.x >= 5.0) { this.pState = "CLEARED"; state.metrics.wait += this.waitTime; state.metrics.pedsCleared++; }
+                } else if (this.pState === "CLEARED") {
+                    this.vx = this.speed;
+                }
+
+                this.x += this.vx * dt;
+                
+                // Track trail history
+                if (Math.random() < 0.2) {
+                    this.history.push({x: this.x, y: this.y});
+                    if (this.history.length > 10) this.history.shift();
+                }
+
+                // Mock ML Intent Update
+                if (this.pState === "APPROACHING" || this.pState === "WAITING") {
+                    let distToCurb = Math.abs(-5.0 - this.x);
+                    if (distToCurb <= 5.0) {
+                        let targetProb = 1.0 - (distToCurb/5.0);
+                        this.intentProb += (targetProb - this.intentProb) * 0.1 + (Math.random()*0.05 - 0.025);
+                        this.intentProb = Math.max(0, Math.min(1, this.intentProb));
+                    }
+                } else { this.intentProb = 0; }
+            }
+        }
+
+        class Vehicle {
+            constructor(id) {
+                this.id = id; this.type = "veh";
+                this.x = (Math.random() > 0.5 ? 1.5 : -1.5); // Two lanes
+                this.y = 50 + Math.random() * 5;
+                this.desiredSpeed = 10 + Math.random() * 2;
+                this.vy = this.desiredSpeed;
+                this.delayTime = 0;
+                this.history = [];
+            }
+
+            update(dt) {
+                let lightRed = (state.phase !== "NS_GREEN");
+                let pedInCrosswalk = state.pedestrians.some(p => p.pState === "CROSSING");
+                
+                let targetStopY = null;
+                if (lightRed && this.y > 5.0) targetStopY = 5.0;
+                if (pedInCrosswalk && this.y > -8.0) {
+                    if (targetStopY === null || -8.0 < targetStopY) targetStopY = -8.0;
+                }
+
+                // Kinematics (Braking vs Accelerating)
+                if (targetStopY !== null && (this.y - targetStopY) < 25.0) {
+                    this.vy = Math.max(0.0, this.vy - 4.0 * dt);
+                } else {
+                    this.vy = Math.min(this.desiredSpeed, this.vy + 2.0 * dt);
+                }
+
+                if (this.vy < this.desiredSpeed * 0.5) this.delayTime += dt;
+
+                this.y -= this.vy * dt;
+
+                // Track trail history
+                if (Math.random() < 0.2) {
+                    this.history.push({x: this.x, y: this.y});
+                    if (this.history.length > 8) this.history.shift();
+                }
+
+                // Cleanup tracking
+                if (this.y < -50) { state.metrics.delay += this.delayTime; state.metrics.vehsCleared++; }
+            }
+        }
+
+        // --- RENDERER ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = wrapper.clientWidth * dpr;
+            canvas.height = wrapper.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function worldToScreen(x, y) {
+            const cx = canvas.width / (window.devicePixelRatio || 1) / 2;
+            const cy = canvas.height / (window.devicePixelRatio || 1) / 2;
+            return { sx: cx + x * CONFIG.scale, sy: cy - y * CONFIG.scale };
+        }
+
+        function drawScene() {
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
+            ctx.clearRect(0, 0, width, height);
+            
+            const origin = worldToScreen(0,0);
+
+            // Sidewalks & Road
+            ctx.fillStyle = CONFIG.colors.sidewalk; ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = CONFIG.colors.road;
+            ctx.fillRect(origin.sx - 40, 0, 80, height); // NS Road
+
+            // Center Dashed Line
+            ctx.strokeStyle = CONFIG.colors.line;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([15, 15]);
+            ctx.beginPath(); ctx.moveTo(origin.sx, 0); ctx.lineTo(origin.sx, height); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Stop Lines & Crosswalk
+            const sy_stop = worldToScreen(0, 5.0).sy;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(origin.sx - 40, sy_stop, 80, 4);
+
+            const cwYTop = worldToScreen(0, -8.0).sy;
+            const cwYBot = worldToScreen(0, -12.0).sy;
+            ctx.fillStyle = CONFIG.colors.crosswalk;
+            for(let cx = origin.sx - 35; cx < origin.sx + 35; cx += 15) {
+                ctx.fillRect(cx, cwYTop, 8, cwYBot - cwYTop);
+            }
+
+            // Draw Agents
+            state.vehicles.forEach(v => {
+                const {sx, sy} = worldToScreen(v.x, v.y);
+                
+                // Trail
+                ctx.beginPath();
+                v.history.forEach((pt, i) => {
+                    const ps = worldToScreen(pt.x, pt.y);
+                    ctx.lineTo(ps.sx, ps.sy);
+                });
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 4; ctx.stroke();
+
+                // Body
+                ctx.fillStyle = CONFIG.colors.veh;
+                ctx.fillRect(sx - 10, sy - 20, 20, 40);
+                // Brake lights
+                ctx.fillStyle = v.vy < 2.0 ? CONFIG.colors.vehBrake : '#f1c40f';
+                ctx.fillRect(sx - 8, sy - 20, 5, 3); ctx.fillRect(sx + 3, sy - 20, 5, 3);
+                
+                // Highlight
+                if(state.selectedAgent && state.selectedAgent.id === v.id) {
+                    ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 2; ctx.strokeRect(sx-12, sy-22, 24, 44);
+                }
+            });
+
+            state.pedestrians.forEach(p => {
+                const {sx, sy} = worldToScreen(p.x, p.y);
+                
+                // Trail
+                ctx.beginPath();
+                p.history.forEach((pt, i) => {
+                    const ps = worldToScreen(pt.x, pt.y);
+                    ctx.lineTo(ps.sx, ps.sy);
+                });
+                ctx.strokeStyle = `rgba(255,255,255,0.15)`; ctx.lineWidth = 2; ctx.stroke();
+
+                // Body
+                ctx.beginPath();
+                ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+                ctx.fillStyle = p.pState === "CROSSING" ? CONFIG.colors.lightGreen : (CONFIG.colors.ped[p.profile] || '#fff');
+                ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+
+                // Intent Prob
+                if(p.intentProb > 0.1 && p.pState !== "CLEARED") {
+                    ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+                    ctx.fillText(p.intentProb.toFixed(2), sx - 10, sy - 12);
+                }
+
+                // Highlight
+                if(state.selectedAgent && state.selectedAgent.id === p.id) {
+                    ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2; ctx.stroke();
+                }
+            });
+
+            // Traffic Light UI overlay on canvas
+            const lColor = state.phase === "EW_GREEN" ? CONFIG.colors.lightGreen : CONFIG.colors.lightRed;
+            ctx.beginPath(); ctx.arc(origin.sx - 60, origin.sy - 60, 15, 0, Math.PI*2);
+            ctx.fillStyle = '#111'; ctx.fill();
+            ctx.beginPath(); ctx.arc(origin.sx - 60, origin.sy - 60, 12, 0, Math.PI*2);
+            ctx.fillStyle = lColor; ctx.fill();
+        }
+
+        // --- SIMULATION LOOP ---
+        let lastTime = performance.now();
+        let pedIdCounter = 1; let vehIdCounter = 1;
+
+        function logEvent(msg) {
+            const logDiv = document.getElementById('event-log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${state.time.toFixed(1)}s]</span> ${msg}`;
+            logDiv.prepend(entry);
+        }
+
+        function updateSimulation() {
+            if (state.paused) return;
+
+            // Spawning logic based on scenario
+            let pedRate = state.scenario === 'heavy' ? 3.0 : 12.0;
+            let vehRate = state.scenario === 'heavy' ? 2.5 : 8.0;
+
+            if (state.time > state.nextPedSpawn) {
+                state.pedestrians.push(new Pedestrian(pedIdCounter++));
+                state.nextPedSpawn = state.time + (Math.random() * pedRate + 2);
+            }
+            if (state.time > state.nextVehSpawn) {
+                state.vehicles.push(new Vehicle(vehIdCounter++));
+                state.nextVehSpawn = state.time + (Math.random() * vehRate + 2);
+            }
+
+            // Controller Logic (Mock)
+            state.phaseTime += CONFIG.dt;
+            let extTriggered = false;
+
+            if (state.phase === "EW_GREEN" && state.phaseTime >= 15) {
+                // Check intent
+                let highIntent = state.pedestrians.some(p => p.intentProb > 0.4 && p.x > -10 && p.x <= -5);
+                
+                if (state.policy === "smart" && highIntent && state.phaseTime < 25) {
+                    if (Math.random() < 0.1) { state.metrics.extensions++; logEvent("Phase extended: High intent pedestrian detected."); extTriggered = true; }
+                } else {
+                    state.phase = "NS_GREEN"; state.phaseTime = 0; logEvent("Phase changed to NS_GREEN (Vehicles)");
+                }
+            } else if (state.phase === "NS_GREEN" && state.phaseTime >= 15) {
+                let vehInDilemma = state.vehicles.some(v => v.y > -12 && v.y < 20);
+                if (!vehInDilemma || state.phaseTime > 30) {
+                    state.phase = "EW_GREEN"; state.phaseTime = 0; logEvent("Phase changed to EW_GREEN (Pedestrians)");
+                }
+            }
+
+            // Update Agents
+            state.pedestrians.forEach(p => p.update(CONFIG.dt));
+            state.vehicles.forEach(v => v.update(CONFIG.dt));
+
+            // Cleanup & Near Miss
+            state.pedestrians.forEach(p => {
+                if (p.pState === "CROSSING" && !p.hasNearMiss) {
+                    state.vehicles.forEach(v => {
+                        let dist = Math.hypot(p.x - v.x, p.y - v.y);
+                        if (dist < 3.0) { p.hasNearMiss = true; state.metrics.misses++; logEvent(`<span style="color:#ef4444">NEAR MISS DETECTED! (TTC < 1.5s)</span>`); }
+                    });
+                }
+            });
+
+            state.pedestrians = state.pedestrians.filter(p => p.x < 20);
+            state.vehicles = state.vehicles.filter(v => v.y > -50);
+
+            state.time += CONFIG.dt;
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('ui-time').innerText = state.time.toFixed(1) + 's';
+            document.getElementById('ui-phase').innerText = state.phase;
+            document.getElementById('ui-phase').style.color = state.phase === "EW_GREEN" ? "var(--accent-green)" : "var(--accent-red)";
+            
+            // KPIs
+            let avgWait = state.metrics.pedsCleared > 0 ? (state.metrics.wait / state.metrics.pedsCleared).toFixed(1) : "0.0";
+            let avgDelay = state.metrics.vehsCleared > 0 ? (state.metrics.delay / state.metrics.vehsCleared).toFixed(1) : "0.0";
+            document.getElementById('kpi-wait').innerText = avgWait + 's';
+            document.getElementById('kpi-delay').innerText = avgDelay + 's';
+            document.getElementById('kpi-misses').innerText = state.metrics.misses;
+            document.getElementById('kpi-extensions').innerText = state.metrics.extensions;
+
+            // Inspector
+            if (state.selectedAgent) {
+                let html = "";
+                let a = state.selectedAgent;
+                if (a.type === "ped") {
+                    html = `ID: PED-${a.id}<br>Profile: <span>${a.profile.toUpperCase()}</span><br>State: ${a.pState}<br>Wait Time: ${a.waitTime.toFixed(1)}s<br>ML Intent Prob: <span>${(a.intentProb*100).toFixed(1)}%</span><br>Entropy (Uncertainty): ${(Math.random()*0.3).toFixed(2)}`;
+                } else {
+                    html = `ID: VEH-${a.id}<br>Speed: <span>${a.vy.toFixed(1)} m/s</span><br>Delay: ${a.delayTime.toFixed(1)}s`;
+                }
+                document.getElementById('inspector-data').innerHTML = html;
+            } else {
+                document.getElementById('inspector-data').innerHTML = "<i>Click any vehicle or pedestrian to inspect state and ML parameters.</i>";
+            }
+        }
+
+        // --- INTERACTION ---
+        document.getElementById('btn-toggle').addEventListener('click', (e) => {
+            state.paused = !state.paused;
+            e.target.innerText = state.paused ? "Resume" : "Pause";
+            e.target.className = state.paused ? "" : "primary";
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            state.time = 0; 
+            state.phaseTime = 0;          // Reset phase timer
+            state.phase = "EW_GREEN";     // Reset to default phase
+            state.pedestrians = []; 
+            state.vehicles = [];
+            state.nextPedSpawn = 0;       // FIX: Reset spawn timer
+            state.nextVehSpawn = 0;       // FIX: Reset spawn timer
+            state.metrics = { wait: 0, delay: 0, misses: 0, extensions: 0, pedsCleared: 0, vehsCleared: 0 };
+            document.getElementById('event-log').innerHTML = "";
+            logEvent("Simulation Restarted.");
+            updateUI();                   // Force UI refresh instantly
+        });
+
+        document.getElementById('ctrl-speed').addEventListener('input', (e) => {
+            state.speedMult = parseFloat(e.target.value);
+            document.getElementById('speed-val').innerText = state.speedMult.toFixed(1) + 'x';
+        });
+
+        document.getElementById('ctrl-policy').addEventListener('change', (e) => {
+            state.policy = e.target.value; logEvent(`Policy switched to: ${e.target.value.toUpperCase()}`);
+        });
+
+        document.getElementById('ctrl-scenario').addEventListener('change', (e) => {
+            state.scenario = e.target.value; logEvent(`Scenario switched to: ${e.target.value.toUpperCase()}`);
+            document.getElementById('btn-restart').click();
+        });
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const mx = (e.clientX - rect.left) * dpr;
+            const my = (e.clientY - rect.top) * dpr;
+
+            state.selectedAgent = null;
+            let minDist = 30 * dpr;
+
+            // Check peds
+            state.pedestrians.forEach(p => {
+                const {sx, sy} = worldToScreen(p.x, p.y);
+                if (Math.hypot(mx - sx, my - sy) < minDist) { state.selectedAgent = p; minDist = Math.hypot(mx - sx, my - sy); }
+            });
+            // Check vehs
+            state.vehicles.forEach(v => {
+                const {sx, sy} = worldToScreen(v.x, v.y);
+                if (Math.hypot(mx - sx, my - sy) < minDist + 20) { state.selectedAgent = v; minDist = Math.hypot(mx - sx, my - sy); }
+            });
+            updateUI();
+        });
+
+        // --- CHARTS (DUMMY DATA FOR DEMO) ---
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+
+        const ctxTradeoff = document.getElementById('tradeoffChart').getContext('2d');
+        new Chart(ctxTradeoff, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    { label: 'FixedTime', data: [{x: 5.2, y: 7.4}], backgroundColor: '#94a3b8', pointRadius: 8 },
+                    { label: 'Heuristic', data: [{x: 10.4, y: 1.5}], backgroundColor: '#ef4444', pointRadius: 8 },
+                    { label: 'Smart (Full)', data: [{x: 7.2, y: 1.7}], backgroundColor: '#3b82f6', pointRadius: 8 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: {
+                    x: { title: { display: true, text: 'Vehicle Delay (s)' } },
+                    y: { title: { display: true, text: 'Pedestrian Wait (s)' } }
+                }
+            }
+        });
+
+        const ctxEquity = document.getElementById('equityChart').getContext('2d');
+        new Chart(ctxEquity, {
+            type: 'bar',
+            data: {
+                labels: ['Normal', 'Slow', 'Distracted', 'Child'],
+                datasets: [
+                    { label: 'Heuristic', data: [1.0, 0.13, 2.43, 1.99], backgroundColor: 'rgba(239, 68, 68, 0.7)' },
+                    { label: 'Smart (Full)', data: [1.0, 1.05, 1.82, 1.01], backgroundColor: 'rgba(59, 130, 246, 0.7)' }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { y: { title: { display: true, text: 'Gap Ratio (1.0 = Fair)' } } }
+            }
+        });
+
+        // --- MAIN LOOP ---
+        function loop() {
+            let now = performance.now();
+            let delta = now - lastTime;
+            
+            // Execute simulation steps based on speed multiplier
+            if (delta > (100 / state.speedMult)) {
+                updateSimulation();
+                lastTime = now;
+            }
+            
+            drawScene();
+            requestAnimationFrame(loop);
+        }
+        
+        logEvent("Simulation Initialized.");
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>
