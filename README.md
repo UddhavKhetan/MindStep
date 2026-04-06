@@ -1,5 +1,5 @@
 
-# 🚦 Machine Learning–Driven Intention-Aware Smart Crosswalk
+# 🚦 MindStep - A Machine Learning–Driven Intention-Aware Smart Crosswalk
 **Simulation Study, Equity Analysis, and Policy Optimization**
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
