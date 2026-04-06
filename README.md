@@ -1,4 +1,3 @@
-Here is a comprehensive, professional `README.md` for your project repository. It is structured to serve both as a technical setup guide and a high-level summary of your research methodology and findings, making it perfect for your GitHub repo, presentation, or portfolio.
 
 ***
 
@@ -126,9 +125,6 @@ start smart_crosswalk_dashboard.html # Windows
 
 ---
 
-## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## 🤝 Acknowledgments
-* Developed as part of a Course-Based Design Project / Thesis Research.
+* Developed as part of a Course-Based Design Project.
 ```
