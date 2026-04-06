@@ -1,12 +1,8 @@
 
-***
-
-```markdown
 # 🚦 Machine Learning–Driven Intention-Aware Smart Crosswalk
 **Simulation Study, Equity Analysis, and Policy Optimization**
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 📖 Overview
 This repository contains a complete, time-stepped 2D kinematic simulation and machine learning pipeline for evaluating an **Intention-Aware Smart Crosswalk**. 
@@ -127,4 +123,3 @@ start smart_crosswalk_dashboard.html # Windows
 
 ## 🤝 Acknowledgments
 * Developed as part of a Course-Based Design Project.
-```
