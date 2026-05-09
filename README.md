@@ -118,8 +118,3 @@ start smart_crosswalk_dashboard.html # Windows
 * **Predictive Features:** Mean, standard deviation, min, max, and energy of 6-axis IMU (Accelerometer + Gyroscope) over a sliding time window.
 * **Safety Proxies:** Instead of binary collision checks, the environment calculates continuous **Time-To-Collision (TTC)** vectors, flagging events where TTC drops below 1.5s as severe conflicts.
 * **Controller Fallback:** In heavy traffic, vehicle platoons can cause "Pedestrian Starvation" if the controller waits for a perfectly clear dilemma zone. The system utilizes an *Absolute Max-Green* fallback, ensuring pedestrians are eventually served even under peak loads.
-
----
-
-## 🤝 Acknowledgments
-* Developed as part of a Course-Based Design Project.
